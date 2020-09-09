@@ -1,4 +1,7 @@
+from enum import auto
 
+vertical = auto()
+horizontal = auto()
 
 class Grid:
     def __init__(self, width, height):
@@ -11,6 +14,17 @@ class Grid:
         return self.__grid[row]
         # Returns the row. When grid[x][y] is called, getitem
         # is called with [x] and returns a list that is then indexed from [y]
+    
+    def __iter__(self):
+        self.__n = 0
+        return self
+
+    def __next__(self):
+        if self.__n >= self.width * self.height:
+            raise StopIteration
+        row, col = divmod(self.__n)
+        self.__n += 1
+        return self.__grid[row][col]
 
     def expand(self, additionalColumns:int):
         for _ in range(additionalColumns):
@@ -33,16 +47,27 @@ class Grid:
 class Player:
     def __init__(self, name:str):
         self.__name = name
+    
+    @property
+    def name(self):
+        return self.__name
 
+class Ship:
+    def __init__(self, name, length, width):
+        self.__name = name
+        self.__length = length
+        self.__width = width
+        
 
 class Game:
-    ship = "#"
-    empty = " "
-    hit = "x"
-    miss = "~"
     dim = 8
+    empty = auto()
+    ship = auto()
+    hit = auto()
 
     def __init__(self, player1:Player, player2:Player):
+        self.__player1 = player1
+        self.__player2 = player2
         self.__board = {
             player1:Grid(Game.dim, Game.dim),
             player2:Grid(Game.dim, Game.dim)}
@@ -50,11 +75,35 @@ class Game:
         self.__turnNumber = 1
 
     def placeShip(self, player:Player, ship:Ship, row:int, column:int, orientation):
-        pass
+        board = self.__board[player]
+        if orientation == vertical:
+            for y in range(ship.width):
+                for x in range(ship.length):
+                    board[row+x][column+y] = Game.ship
+        else:
+            for x in range(ship.width):
+                for y in range(ship.height):
+                    board[row+x][column+y] = Game.ship
 
     def fire(self, row:int, column:int):
-        pass
+        board = self.__board[self.playerOpponent(self.__currentPlayerTurn)]
+        if board[row][column] == Game.ship:
+            board[row][column] = Game.hit
+            return True
+        else:
+            return False
+
+    def playerOpponent(self, player:Player):
+        if player == self.__player1:
+            return self.__player2
+        else:
+            return self.__player1
 
     @property
     def winner(self):
-        pass
+        for player, board in self.__board.items():
+            for square in board:
+                if square == Game.ship:
+                    break
+            return self.playerOpponent(player)
+        return None
