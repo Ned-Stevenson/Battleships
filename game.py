@@ -57,6 +57,18 @@ class Ship:
         self.__name = name
         self.__length = length
         self.__width = width
+    
+    @property
+    def name(self):
+        return self.__name
+    
+    @property
+    def width(self):
+        return self.__width
+    
+    @property
+    def length(self):
+        return self.__length
         
 
 class Game:
@@ -64,15 +76,16 @@ class Game:
     empty = auto()
     ship = auto()
     hit = auto()
+    miss = auto()
+    icons = {empty:" ", ship:"#", hit:"x", miss:"~"}
 
-    def __init__(self, player1:Player, player2:Player):
-        self.__player1 = player1
-        self.__player2 = player2
+    def __init__(self, player1Name, player2Name):
+        self.__player1 = Player(player1Name)
+        self.__player2 = Player(player2Name)
         self.__board = {
-            player1:Grid(Game.dim, Game.dim),
-            player2:Grid(Game.dim, Game.dim)}
-        self.__currentPlayerTurn = player1
-        self.__turnNumber = 1
+            self.__player1:Grid(Game.dim, Game.dim),
+            self.__player2:Grid(Game.dim, Game.dim)}
+        self.__currentPlayerTurn = self.__player1
 
     def placeShip(self, player:Player, ship:Ship, row:int, column:int, orientation):
         board = self.__board[player]
@@ -99,6 +112,17 @@ class Game:
         else:
             return self.__player1
 
+    def changeTurn(self):
+        self.__currentPlayerTurn = self.playerOpponent(self.__currentPlayerTurn)
+
+    @property
+    def board(self):
+        return self.__board
+
+    @property
+    def currentPlayerTurn(self):
+        return self.__currentPlayerTurn
+
     @property
     def winner(self):
         for player, board in self.__board.items():
@@ -107,3 +131,9 @@ class Game:
                     break
             return self.playerOpponent(player)
         return None
+
+SHIPS = [Ship("Carrier", 5, 1),
+Ship("Battleship", 4, 1),
+Ship("Crusier", 3, 1),
+Ship("Submarine", 3, 1),
+Ship("Destroyer", 2, 1)]
