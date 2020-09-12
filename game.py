@@ -5,10 +5,10 @@ horizontal = auto()
 
 class Grid:
     def __init__(self, width, height):
-        self.__grid = [[None for _ in range(height)] for _ in range(width)]
+        self.__grid = [[None for _ in range(width)] for _ in range(height)]
 
     def __len__(self):
-        return len(self.width)*len(self.height)
+        return self.width*self.height
 
     def __getitem__(self, row):
         return self.__grid[row]
@@ -22,7 +22,7 @@ class Grid:
     def __next__(self):
         if self.__n >= self.width * self.height:
             raise StopIteration
-        row, col = divmod(self.__n)
+        col, row = divmod(self.__n, self.width)
         self.__n += 1
         return self.__grid[row][col]
 
@@ -73,11 +73,10 @@ class Ship:
 
 class Game:
     dim = 8
-    empty = auto()
+    empty = None
     ship = auto()
     hit = auto()
     miss = auto()
-    icons = {empty:" ", ship:"#", hit:"x", miss:"~"}
 
     def __init__(self, player1Name, player2Name):
         self.__player1 = Player(player1Name)
@@ -87,7 +86,7 @@ class Game:
             self.__player2:Grid(Game.dim, Game.dim)}
         self.__currentPlayerTurn = self.__player1
 
-    def placeShip(self, player:Player, ship:Ship, row:int, column:int, orientation):
+    def placeShip(self, player:Player, ship:Ship, column:int, row:int, orientation):
         board = self.__board[player]
         if orientation == vertical:
             for y in range(ship.width):
@@ -95,16 +94,17 @@ class Game:
                     board[row+x][column+y] = Game.ship
         else:
             for x in range(ship.width):
-                for y in range(ship.height):
+                for y in range(ship.length):
                     board[row+x][column+y] = Game.ship
 
-    def fire(self, row:int, column:int):
+    def fire(self, column:int, row:int):
         board = self.__board[self.playerOpponent(self.__currentPlayerTurn)]
         if board[row][column] == Game.ship:
             board[row][column] = Game.hit
             return True
         else:
-            return False
+            board[row][column] = Game.miss
+        return False
 
     def playerOpponent(self, player:Player):
         if player == self.__player1:
@@ -126,10 +126,12 @@ class Game:
     @property
     def winner(self):
         for player, board in self.__board.items():
+            win = True
             for square in board:
                 if square == Game.ship:
-                    break
-            return self.playerOpponent(player)
+                    win = False
+            if win == True:
+                return self.playerOpponent(player)
         return None
 
 SHIPS = [Ship("Carrier", 5, 1),
