@@ -58,6 +58,11 @@ class Ship:
         self.__length = length
         self.__width = width
     
+    def __repr__(self):
+        return f"""Name: {self.__name}
+        Length: {self.__length}
+        Width: {self.__width}"""
+
     @property
     def name(self):
         return self.__name

@@ -34,9 +34,9 @@ class Terminal(Ui):
 
     def run(self):
         for player in self.__game.board:
-            shipsToPlace = SHIPS
+            shipsToPlace = SHIPS[::]
             for ship in SHIPS:
-                print(f"Ships left to be placed: {','.join(shipsToPlace)}")
+                print(f"Ships left to be placed: {', '.join([ship.name for ship in shipsToPlace])}")
                 self.printBoard(player)
                 print(f"{player.name}, place your ships!")
                 while True:
