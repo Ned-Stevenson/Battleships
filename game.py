@@ -58,6 +58,11 @@ class Ship:
         self.__length = length
         self.__width = width
     
+    def __str__(self):
+        return f"""Name: {self.__name}
+        Length: {self.__length}
+        Width: {self.__width}"""
+
     @property
     def name(self):
         return self.__name
@@ -87,7 +92,23 @@ class Game:
         self.__currentPlayerTurn = self.__player1
 
     def placeShip(self, player:Player, ship:Ship, column:int, row:int, orientation):
+        assert orientation in (horizontal, vertical)
+        assert 0 <= row < Game.dim and 0 <= column < Game.dim
+        if orientation == vertical:
+            assert row + ship.length-1 < Game.dim and column + ship.width-1 < Game.dim
+        else:
+            assert column + ship.length-1 < Game.dim and row + ship.width-1 < Game.dim
         board = self.__board[player]
+
+        if orientation == vertical:
+            for y in range(ship.width):
+                for x in range(ship.length):
+                    assert board[row+x][column+y] == None
+        else:
+            for x in range(ship.width):
+                for y in range(ship.length):
+                    assert board[row+x][column+y] == None
+
         if orientation == vertical:
             for y in range(ship.width):
                 for x in range(ship.length):
@@ -97,7 +118,9 @@ class Game:
                 for y in range(ship.length):
                     board[row+x][column+y] = Game.ship
 
+
     def fire(self, column:int, row:int):
+        assert 0 <= row < Game.dim and 0 <= column <Game.dim
         board = self.__board[self.playerOpponent(self.__currentPlayerTurn)]
         if board[row][column] == Game.ship:
             board[row][column] = Game.hit
