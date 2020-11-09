@@ -1,3 +1,9 @@
+#Test Cases
+Test States/
+
+#Documentation
+Documentation/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

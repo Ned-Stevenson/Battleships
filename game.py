@@ -1,4 +1,5 @@
 from enum import auto
+from exceptions import ShotError
 
 vertical = auto()
 horizontal = auto()
@@ -60,8 +61,8 @@ class Ship:
     
     def __str__(self):
         return f"""Name: {self.__name}
-        Length: {self.__length}
-        Width: {self.__width}"""
+Length: {self.__length}
+Width: {self.__width}"""
 
     @property
     def name(self):
@@ -86,20 +87,27 @@ class Game:
     def __init__(self, player1Name, player2Name):
         self.__player1 = Player(player1Name)
         self.__player2 = Player(player2Name)
+        # The board requires 4 seperate grids. A grid of ships and grid of shots for each player
+        # A tuple is used with ships in position 0 and shots in position 1
         self.__board = {
-            self.__player1:Grid(Game.dim, Game.dim),
-            self.__player2:Grid(Game.dim, Game.dim)}
+            self.__player1:(Grid(Game.dim, Game.dim), Grid(Game.dim, Game.dim)),
+            self.__player2:(Grid(Game.dim, Game.dim), Grid(Game.dim, Game.dim))}
         self.__currentPlayerTurn = self.__player1
 
     def placeShip(self, player:Player, ship:Ship, column:int, row:int, orientation):
+        #Checking that the ship will remain within the bounds of the board
+        # This will raise an AssertionError if the ship does not remain within the board
         assert orientation in (horizontal, vertical)
         assert 0 <= row < Game.dim and 0 <= column < Game.dim
         if orientation == vertical:
             assert row + ship.length-1 < Game.dim and column + ship.width-1 < Game.dim
         else:
             assert column + ship.length-1 < Game.dim and row + ship.width-1 < Game.dim
-        board = self.__board[player]
+        board = self.__board[player][0]
+        # This board is the grid belonging to the relevant player tracking that player's ships
 
+        # Checking that the area that the ship will go in is empty
+        # This check myst be done before the ship starts to be placed
         if orientation == vertical:
             for y in range(ship.width):
                 for x in range(ship.length):
@@ -109,6 +117,7 @@ class Game:
                 for y in range(ship.length):
                     assert board[row+x][column+y] == None
 
+        # Placing the ship
         if orientation == vertical:
             for y in range(ship.width):
                 for x in range(ship.length):
@@ -121,12 +130,18 @@ class Game:
 
     def fire(self, column:int, row:int):
         assert 0 <= row < Game.dim and 0 <= column <Game.dim
-        board = self.__board[self.playerOpponent(self.__currentPlayerTurn)]
-        if board[row][column] == Game.ship:
-            board[row][column] = Game.hit
+        # The ship board is the map of enemy ships and the shot board is the current player's board
+        # of shots It is needed to track the shots taken
+        ShipBoard = self.__board[self.playerOpponent(self.__currentPlayerTurn)][0]
+        ShotBoard = self.__board[self.__currentPlayerTurn][1]
+        if ShipBoard[row][column] == Game.ship:
+            ShotBoard[row][column] = Game.hit
             return True
+        elif ShipBoard[row][column] == Game.empty:
+            ShotBoard[row][column] = Game.miss
         else:
-            board[row][column] = Game.miss
+            return ShotError
+            #This will be returned if the player fires at a square already fired at
         return False
 
     def playerOpponent(self, player:Player):
@@ -148,13 +163,22 @@ class Game:
 
     @property
     def winner(self):
-        for player, board in self.__board.items():
+        # Itterating through each board of ships and checking to see if any ships remain
+        for player, playerBoard in self.__board.items():
+            shipBoard = playerBoard[0]
             win = True
-            for square in board:
-                if square == Game.ship:
-                    win = False
+            for row in range(Game.dim):
+                for col in range(Game.dim):
+                    square = shipBoard[row][col]
+                    if square == Game.ship:
+                        if playerBoard[1][row][col] != Game.hit:
+                            win = False
+                            break
+                    # For each square on the board, if there is a ship, check if it is hit. If not, the player has not won
             if win == True:
+                print(f"{self.playerOpponent(playerBoard)} has won!") #Debug
                 return self.playerOpponent(player)
+        print("No winner yet") #Debug
         return None
 
 SHIPS = [Ship("Carrier", 5, 1),

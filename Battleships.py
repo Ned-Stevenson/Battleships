@@ -3,20 +3,16 @@ from sys import argv
 
 def usage():   
     print(f"""
-Usage: {argv[0]} [g | t]
-g : play with the GUI
-t : play with the Terminal""")
-    quit()
+Usage: {argv[0]} - run in Terminal
+{argv[0]} g - Run with the GUI""")
 
 if __name__ == "__main__":
     if len(argv) != 2: #Ensures the program was called properly from the terminal with the file name and argument
-        usage()
+        ui = Terminal()
     elif argv[1] == "g":
         ui = Gui()
-        
-    elif argv[1] == "t":
-        ui = Terminal()
     else:
         usage()
+        ui = Terminal()
     
     ui.run()
