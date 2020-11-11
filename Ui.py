@@ -113,11 +113,11 @@ class Terminal(Ui):
                 elif choise == "3":
                     for ship in SHIPS:
                         print(str(ship)+"\n")
-
-        print(f"{self.__game.playerOpponent(player).name} is the winner!")
-        print(f"{self.__game.winner}\'s board:")
+        winner = self.__game.winner
+        print(f"{winner.name} is the winner!")
+        print(f"{winner.name}\'s board:")
         self.printBoard(self.__game.winner, showShips = True)
-        print(f"{self.__game.playerOpponent(self.__game.winner)}\'s board:")
+        print(f"{self.__game.playerOpponent(winner).name}\'s board:")
         self.printBoard(self.__game.playerOpponent(self.__game.winner), showShips = True)
 
     def turnMenu(self):

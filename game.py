@@ -171,14 +171,13 @@ class Game:
                 for col in range(Game.dim):
                     square = shipBoard[row][col]
                     if square == Game.ship:
-                        if playerBoard[1][row][col] != Game.hit:
+                        if self.board[self.playerOpponent(player)][1][row][col] != Game.hit:
                             win = False
-                            break
+                if win == False:
+                    break
                     # For each square on the board, if there is a ship, check if it is hit. If not, the player has not won
             if win == True:
-                print(f"{self.playerOpponent(playerBoard)} has won!") #Debug
                 return self.playerOpponent(player)
-        print("No winner yet") #Debug
         return None
 
 SHIPS = [Ship("Carrier", 5, 1),
