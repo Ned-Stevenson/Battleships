@@ -145,18 +145,6 @@ class Gui(Ui): #To Do
         self._currentFrame.pack_forget()
         self._mainMenu.pack(fill = BOTH, expand = True)
 
-class ConsoleWidget(Frame):
-    def __init__(self, root, background = "green", foreground = "black", font = ("Courier New", 12)):
-        self.__numberOfConsoleItems = 0
-        self.__backgroundColour = background
-        self.__textColour = foreground
-        self.__font = font
-        self.__frame = Frame(root, bg = background)
-        raise NotImplementedError
-
-    def addConsoleItem(self, message):
-        Label(self.__frame, fg = self.__textColour, bg = self.__backgroundColour, font = self.__font, text = message, anchor = W).grid(row = self.__numberOfConsoleItems, column = 0, sticky = N+S+E+W)
-        self.__numberOfConsoleItems += 1
 
 class Terminal(Ui):
     def __init__(self):
