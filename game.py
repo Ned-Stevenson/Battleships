@@ -1,5 +1,5 @@
 from enum import auto
-from exceptions import ShotError
+from exceptions import ShotError, ShipPlacementError
 
 vertical = auto()
 horizontal = auto()
@@ -76,6 +76,17 @@ Width: {self.__width}"""
     def length(self):
         return self.__length
         
+class ShipPart(Ship):
+    def __init__(self):
+        self.__parentShip = None
+        raise NotImplementedError
+
+    def onHit(self):
+        """Calls a function in the parent ship that tells it that it has been 
+        hit, so that it can decrement it's remaining health and return if the ship has been sunk.
+        returns False if the ship hit has not been sunk and a Ship object if it has been sunk"""
+        return self.__parentShip.hit() # to do
+
 
 class Game:
     dim = 8
@@ -97,15 +108,10 @@ class Game:
     def placeShip(self, player:Player, ship:Ship, column:int, row:int, orientation):
         #Checking that the ship will remain within the bounds of the board
         # This will raise an AssertionError if the ship does not remain within the board
-        assert orientation in (horizontal, vertical)
-        assert 0 <= row < Game.dim and 0 <= column < Game.dim
-        if orientation == vertical:
-            assert row + ship.length-1 < Game.dim and column + ship.width-1 < Game.dim
-        else:
-            assert column + ship.length-1 < Game.dim and row + ship.width-1 < Game.dim
-        board = self.__board[player][0]
+        if not self.IsValidPlacement(ship, row, column, orientation):
+            raise ShipPlacementError
         # This board is the grid belonging to the relevant player tracking that player's ships
-
+        board = self.__board[player][0]
         # Checking that the area that the ship will go in is empty
         # This check myst be done before the ship starts to be placed
         if orientation == vertical:
@@ -127,6 +133,24 @@ class Game:
                 for y in range(ship.length):
                     board[row+x][column+y] = Game.ship
 
+    def IsValidPlacement(self, ship, row, col, orientation):
+        if orientation not in (horizontal, vertical):
+            return False
+        # Check the initial point is within the constrains of the board
+        if not (0 <= row < Game.dim and 0 <= col < Game.dim):
+            return False
+        
+        if orientation == vertical:
+            if row + ship.length-1 < Game.dim and col + ship.width-1 < Game.dim:
+                pass
+            else:
+                return False
+        else:
+            if col + ship.length-1 < Game.dim and row + ship.width-1 < Game.dim:
+                pass
+            else:
+                return False
+        return True
 
     def fire(self, column:int, row:int):
         assert 0 <= row < Game.dim and 0 <= column <Game.dim
