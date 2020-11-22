@@ -165,7 +165,7 @@ class Game:
             ShotBoard[row][column] = Game.miss
         else:
             return ShotError
-            #This will be returned if the player fires at a square already fired at
+            # This will be returned if the player fires at a square already fired at
         return False
 
     def playerOpponent(self, player:Player):
