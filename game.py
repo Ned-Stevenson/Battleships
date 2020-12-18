@@ -4,8 +4,8 @@ from exceptions import ShotError, ShipPlacementError
 vertical = auto()
 horizontal = auto()
 
-class Grid:
-    def __init__(self, width, height):
+class Array2d:
+    def __init__(self, width:int, height:int):
         self.__grid = [[None for _ in range(width)] for _ in range(height)]
 
     def __len__(self):
@@ -94,15 +94,17 @@ class Game:
     ship = auto()
     hit = auto()
     miss = auto()
-
+    ShotBoard = auto()
+    ShipBoard = auto()
+    
     def __init__(self, player1Name, player2Name):
         self.__player1 = Player(player1Name)
         self.__player2 = Player(player2Name)
         # The board requires 4 seperate grids. A grid of ships and grid of shots for each player
-        # A tuple is used with ships in position 0 and shots in position 1
+        # A namedtuple is used like an immutabled dictionary keyed using the class constants ShotBoard and ShipBoard
         self.__board = {
-            self.__player1:(Grid(Game.dim, Game.dim), Grid(Game.dim, Game.dim)),
-            self.__player2:(Grid(Game.dim, Game.dim), Grid(Game.dim, Game.dim))}
+            self.__player1:{Game.ShotBoard:Array2d(Game.dim, Game.dim), Game.ShipBoard:Array2d(Game.dim, Game.dim)},
+            self.__player2:{Game.ShotBoard:Array2d(Game.dim, Game.dim), Game.ShipBoard:Array2d(Game.dim, Game.dim)}}
         self.__currentPlayerTurn = self.__player1
 
     def placeShip(self, player:Player, ship:Ship, column:int, row:int, orientation):
@@ -156,8 +158,8 @@ class Game:
         assert 0 <= row < Game.dim and 0 <= column <Game.dim
         # The ship board is the map of enemy ships and the shot board is the current player's board
         # of shots It is needed to track the shots taken
-        ShipBoard = self.__board[self.playerOpponent(self.__currentPlayerTurn)][0]
-        ShotBoard = self.__board[self.__currentPlayerTurn][1]
+        ShipBoard = self.__board[self.playerOpponent(self.__currentPlayerTurn)][Game.ShipBoard]
+        ShotBoard = self.__board[self.__currentPlayerTurn][Game.ShotBoard]
         if ShipBoard[row][column] == Game.ship:
             ShotBoard[row][column] = Game.hit
             return True
@@ -195,7 +197,7 @@ class Game:
                 for col in range(Game.dim):
                     square = shipBoard[row][col]
                     if square == Game.ship:
-                        if self.board[self.playerOpponent(player)][1][row][col] != Game.hit:
+                        if self.board[self.playerOpponent(player)][Game.ShotBoard][row][col] != Game.hit:
                             win = False
                 if win == False:
                     break

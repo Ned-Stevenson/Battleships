@@ -1,14 +1,20 @@
-from game import Game, SHIPS, vertical, horizontal
+from game import Game, SHIPS, vertical, horizontal ,Array2d
 from exceptions import ShotError
-from tkinter import Tk, Frame, Button, Grid, Label, Entry, N, S, E, W, X, Y, BOTH, BOTTOM
+from tkinter import Tk, Frame, Button, Grid, Label, Entry, StringVar, N, S, E, W, X, Y, BOTH, BOTTOM
 from itertools import product
 
 class Ui:
     def __init__(self):
-        pass
+        self._ship = "#"
+        self._sea = " "
+        self._hit = "X"
+        self._miss = "/"
+        self._icons = {Game.empty: self._sea, Game.ship: self._ship,
+        Game.hit: self._hit, Game.miss: self._miss}
 
 class Gui(Ui): #To Do
     def __init__(self):
+        super(Gui, self).__init__()
         self._defaultText = ("Consolas", 20)
         self._background = "navy"
         self._text = "white"
@@ -52,7 +58,7 @@ class Gui(Ui): #To Do
         player2Box.insert(0, "Player 2")
         player1Box.grid(row = 0, column = 0)
         player2Box.grid(row = 1, column = 0)
-        # This lambda, when called 
+        # This lambda, when called, will simply apply the player names to the game GUI constructor
         startGame = lambda: self.__startGame(player1Box.get(), player2Box.get())
         Button(frame, text = "Start game", command = startGame, **self._defaultLayout).grid(row = 0, column = 1, rowspan = 2, sticky = N+S+E+W)
         Button(frame, text = "Return to main menu", command = self.__returnToMainMenu, **self._defaultLayout).grid(row = 2, column = 0, columnspan = 2, sticky = N+S+E+W)
@@ -63,7 +69,7 @@ class Gui(Ui): #To Do
         frame.grid_columnconfigure(1, weight = 1)
 
     def __startGame(self, player1Name, player2Name):
-        # game = Game(player1Name, player2Name)
+        game = Game(player1Name, player2Name)
         # Creating a frame for the whole window and placing a board frame within the larger frame
         self._currentFrame.pack_forget()
         frame = Frame(self._root, bg = self._background)
@@ -79,6 +85,7 @@ class Gui(Ui): #To Do
         frame.grid_columnconfigure(2, weight = 1)
 
         # Creating the tiling of buttons as well as the row and column labels
+        self.__buttons = Array2d(Game.dim, Game.dim)
         for row, col in product(range(Game.dim+1), range(Game.dim+1)):
             if row == 0:
                 if col == 0:
@@ -89,15 +96,28 @@ class Gui(Ui): #To Do
             elif col == 0:
                 Label(board, text = str(row), **self._defaultLayout).grid(row = row, column = col, sticky = N+S+E+W)
             else:
+                row -= 1
+                col -= 1
                 # To do Create a function or lambda to be called when the button is pressed
-                Button(board, **self._defaultLayout).grid(row = row, column = col, sticky = N+S+E+W)
-        
+                b = StringVar()
+                b.set(self._icons[game.board[game.currentPlayerTurn][Game.ShotBoard][row][col]])
+                # Get the shot status of the location and player in question and look up the character to represent it
+                cmd = lambda r=row,c=col : print(f"Button click at {row=}, {col=}")
+
+                Button(
+                    board,
+                    textvariable = b,
+                    command = cmd,
+                    **self._defaultLayout
+                ).grid(row = row+1, column = col+1, sticky = N+S+E+W)
+                self.__buttons[row][col] = b
+
         # Ensuring all the tiles in the grid are square
         for row in range(Game.dim+1):
             board.grid_rowconfigure(row, weight = 1)
         for col in range(Game.dim+1):
             board.grid_columnconfigure(col, weight = 1)
-        
+
         # The console will be a list of events like a computer console that will remind the player what has happened
         # It will be a frame with Labels packed onto the frame after each event
         console = Frame(frame, bg = "black")
@@ -148,25 +168,20 @@ class Gui(Ui): #To Do
 
 class Terminal(Ui):
     def __init__(self):
-        self.__ship = "#"
-        self.__sea = " "
-        self.__hit = "X"
-        self.__miss = "/"
-        self.__icons = {Game.empty: self.__sea, Game.ship: self.__ship,
-        Game.hit: self.__hit, Game.miss: self.__miss}
+        super(Terminal, self).__init__()
         self.__game = Game(input("Input player 1 name: "), input("Input player 2 name: "))
         self.__playerPasswords = {}
     
     def printBoard(self, player, showShips = False):
         s = "  A B C D E F G H\n"
         h = " " + "-"*(2*Game.dim+1)
-        boardIndex = 0 if showShips else 1
+        boardIndex = Game.ShipBoard if showShips else Game.ShotBoard
         Board = self.__game.board[player][boardIndex]
         # Produce a representation of each row in board using a lookup dictionary
         for row in range(Game.dim):
             r = f"{row+1}|"
             for col in range(Game.dim):
-                iconToShow = self.__icons[Board[row][col]]
+                iconToShow = self._icons[Board[row][col]]
                 r += iconToShow +"|"
             s += h + "\n" + r + "\n"
         s += h
