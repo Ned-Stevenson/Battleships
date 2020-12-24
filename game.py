@@ -1,5 +1,6 @@
 from enum import auto
 from exceptions import ShotError, ShipPlacementError
+from itertools import product
 
 vertical = auto()
 horizontal = auto()
@@ -58,11 +59,26 @@ class Ship:
         self.__name = name
         self.__length = length
         self.__width = width
+        self.__shape = Array2d(self.__length, self.__width)
+        for row, col in product(range(self.__length), range(self.__width)):
+            self.__shape[col][row] = ShipPart(self)
+
     
     def __str__(self):
         return f"""Name: {self.__name}
 Length: {self.__length}
 Width: {self.__width}"""
+
+    def __iter__(self):
+        self.__n = 0
+        return self
+
+    def __next__(self):
+        if self.__n >= self.__length * self.__width:
+            raise StopIteration
+        col, row = divmod(self.__n, self.__length)
+        self.__n += 1
+        return self.__shape[row][col]
 
     @property
     def name(self):
@@ -75,11 +91,15 @@ Width: {self.__width}"""
     @property
     def length(self):
         return self.__length
+    
+    @property
+    def shape(self):
+        return self.__shape
         
 class ShipPart(Ship):
-    def __init__(self):
-        self.__parentShip = None
-        raise NotImplementedError
+    def __init__(self, parentShip):
+        self.__parentShip = parentShip
+        # raise NotImplementedError
 
     def onHit(self):
         """Calls a function in the parent ship that tells it that it has been 
@@ -110,20 +130,10 @@ class Game:
     def placeShip(self, player:Player, ship:Ship, column:int, row:int, orientation):
         #Checking that the ship will remain within the bounds of the board
         # This will raise an AssertionError if the ship does not remain within the board
-        if not self.IsValidPlacement(ship, row, column, orientation):
+        if not self.IsValidPlacement(player, ship, row, column, orientation):
             raise ShipPlacementError
         # This board is the grid belonging to the relevant player tracking that player's ships
-        board = self.__board[player][0]
-        # Checking that the area that the ship will go in is empty
-        # This check myst be done before the ship starts to be placed
-        if orientation == vertical:
-            for y in range(ship.width):
-                for x in range(ship.length):
-                    assert board[row+x][column+y] == None
-        else:
-            for x in range(ship.width):
-                for y in range(ship.length):
-                    assert board[row+x][column+y] == None
+        board = self.__board[player][Game.ShipBoard]
 
         # Placing the ship
         if orientation == vertical:
@@ -135,13 +145,14 @@ class Game:
                 for y in range(ship.length):
                     board[row+x][column+y] = Game.ship
 
-    def IsValidPlacement(self, ship, row, col, orientation):
+    def IsValidPlacement(self, player, ship, row, col, orientation):
+        board = self.__board[player][Game.ShipBoard]
         if orientation not in (horizontal, vertical):
             return False
         # Check the initial point is within the constrains of the board
         if not (0 <= row < Game.dim and 0 <= col < Game.dim):
             return False
-        
+
         if orientation == vertical:
             if row + ship.length-1 < Game.dim and col + ship.width-1 < Game.dim:
                 pass
@@ -152,7 +163,30 @@ class Game:
                 pass
             else:
                 return False
-        return True
+
+        # Checking that the area that the ship will go in is empty
+        # This check myst be done before the ship starts to be placed
+        shipNotOverlapping = True
+        if orientation == vertical:
+            for y in range(ship.width):
+                for x in range(ship.length):
+                    if board[row+x][col+y] != None:
+                        shipNotOverlapping = False
+        else:
+            for x in range(ship.width):
+                for y in range(ship.length):
+                    if board[row+x][col+y] != None:
+                        shipNotOverlapping = False
+        return shipNotOverlapping
+
+    def coveredSquares(self, ship, row, column, orientation):
+        coveredSquares = []
+        for shipRow, shipCol in product(range(ship.width), range(ship.length)):
+            deltaR = shipRow if orientation == horizontal else shipCol
+            deltaC = shipCol if orientation == horizontal else shipRow
+            if ship.shape[shipRow][shipCol] != None:
+                coveredSquares.append((row + deltaR, column + deltaC))
+        return coveredSquares
 
     def fire(self, column:int, row:int):
         assert 0 <= row < Game.dim and 0 <= column <Game.dim

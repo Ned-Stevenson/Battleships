@@ -1,7 +1,8 @@
 from game import Game, SHIPS, vertical, horizontal ,Array2d
 from exceptions import ShotError
-from tkinter import Tk, Frame, Button, Grid, Label, Entry, StringVar, N, S, E, W, X, Y, BOTH, BOTTOM
+from tkinter import Tk, Frame, Button, Grid, Label, Entry, Text, StringVar, N, S, E, W, X, Y, BOTH, TOP, BOTTOM, DISABLED, SOLID
 from itertools import product
+from enum import auto
 
 class Ui:
     def __init__(self):
@@ -13,6 +14,10 @@ class Ui:
         Game.hit: self._hit, Game.miss: self._miss}
 
 class Gui(Ui): #To Do
+
+    shipPlacement = auto()
+    shotsBeingTaken = auto()
+
     def __init__(self):
         super(Gui, self).__init__()
         self._defaultText = ("Consolas", 20)
@@ -70,14 +75,15 @@ class Gui(Ui): #To Do
 
     def __startGame(self, player1Name, player2Name):
         game = Game(player1Name, player2Name)
+        self.__game = game
         # Creating a frame for the whole window and placing a board frame within the larger frame
         self._currentFrame.pack_forget()
         frame = Frame(self._root, bg = self._background)
-        frame.pack(fill = BOTH, expand = True)
-        self._currentFrame = frame
+        frame.bind_all("r", self.__toggleOrientation)
 
         board = Frame(frame, bg = self._background)
         board.grid(row = 0, column = 0, sticky = N+S+E+W, rowspan = 3)
+        self.__boardFrame = board
         
         frame.grid_rowconfigure(0, weight = 2)
         frame.grid_columnconfigure(0, weight = 4)
@@ -102,14 +108,19 @@ class Gui(Ui): #To Do
                 b = StringVar()
                 b.set(self._icons[game.board[game.currentPlayerTurn][Game.ShotBoard][row][col]])
                 # Get the shot status of the location and player in question and look up the character to represent it
-                cmd = lambda r=row,c=col : print(f"Button click at {row=}, {col=}")
-
-                Button(
+                press = lambda r=row,c=col : self.__boardButtonPress(r, c)
+                hover = lambda event, r=row, c=col : self.__hoverOverSquare(r, c)
+                unhover = lambda event, r=row, c=col : self.__removeShipShadow(r, c)
+                
+                button = Button(
                     board,
                     textvariable = b,
-                    command = cmd,
+                    command = press,
                     **self._defaultLayout
-                ).grid(row = row+1, column = col+1, sticky = N+S+E+W)
+                )
+                button.grid(row = row+1, column = col+1, sticky = N+S+E+W)
+                button.bind("<Enter>", hover)
+                button.bind("<Leave>", unhover)
                 self.__buttons[row][col] = b
 
         # Ensuring all the tiles in the grid are square
@@ -122,14 +133,98 @@ class Gui(Ui): #To Do
         # It will be a frame with Labels packed onto the frame after each event
         console = Frame(frame, bg = "black")
         console.grid(row = 0, column = 1, sticky = N+S+E+W)
-        
+        console.grid_columnconfigure(0, weight = 1)
+        self.__consoleFrame = console
+        self.__consoleLabelCount = 0
         # To Do Implement adding messages to the console when an event occurs
+
+        self.__shipPlacementOrientation = horizontal
+        self.__boardMode = Gui.shipPlacement
+        self.__selectedShip = None
 
         shipIcons = Frame(frame, bg = self._background)
         shipIcons.grid(row = 0, column = 2, sticky = N+S+E+W)
+        shipIcons.grid_columnconfigure(0, weight = 1)
+        self.__shipIconsFrame = shipIcons
+
+        for index, ship in enumerate(SHIPS):
+            cmd = lambda s=ship, i=index: self.__setSelectedShip(s, i)
+            shipText = ship.name.upper() + "\n\n" + "\n".join([self._ship * ship.length for _ in range(ship.width)])
+            shipButton = Button(shipIcons, fg = "gray20", text = shipText, font = ("Inconsolata", 20), borderwidth = 2, relief = SOLID, command = cmd)
+            shipButton.grid(row = index, column = 0, sticky = N+S+E+W)
+            shipIcons.grid_rowconfigure(index, weight = 1)
+
+        frame.pack(fill = BOTH, expand = True)
+        self._currentFrame = frame
 
         Button(frame, **self._defaultLayout, command = self.__returnToMainMenu, text = "Return to main menu").grid(row = 1, column = 1, sticky = N+S+E+W, columnspan = 2)
         Button(frame, **self._defaultLayout, text = "Save Game").grid(row = 2, column = 1, sticky = N+S+E+W, columnspan = 2)
+
+    def __boardButtonPress(self, row, col):
+        if self.__boardMode == Gui.shipPlacement:
+            self.__placeShip(row, col)
+
+    def __setSelectedShip(self, ship, shipIndex):
+        for i in range(len(SHIPS)):
+            shipButton = self.__shipIconsFrame.grid_slaves(row = i, column = 0)[0]
+            if shipButton.cget("state") != DISABLED:
+                shipButton.config(bg = "SystemButtonFace")
+        self.__selectedShip = ship
+        shipButton = self.__shipIconsFrame.grid_slaves(row = shipIndex, column = 0)[0]
+        shipButton.config(bg = "gray")
+
+    def __toggleOrientation(self, *args):
+        self.__removeShipShadow(self.__hoverRow, self.__hoverColumn, orientation=self.__shipPlacementOrientation)
+        self.__shipPlacementOrientation = vertical if self.__shipPlacementOrientation == horizontal else horizontal
+        self.__createShipShadow(self.__hoverRow, self.__hoverColumn)
+
+    def __hoverOverSquare(self, row, col):
+        if self.__selectedShip != None:
+            self.__hoverRow = row
+            self.__hoverColumn = col
+            self.__createShipShadow(row, col)
+
+    def __placeShip(self, row, column):
+        if self.__selectedShip != None:
+            self.__game.placeShip(self.__game.currentPlayerTurn, self.__selectedShip, column, row, self.__shipPlacementOrientation)
+            shipIndex = SHIPS.index(self.__selectedShip)
+            shipSelectionButton = self.__shipIconsFrame.grid_slaves(shipIndex, 0)[0]
+            shipSelectionButton.config(state = DISABLED, bg = "gray20")
+            self.__selectedShip = None
+
+    def __createShipShadow(self, row, column):
+        if self.__game.IsValidPlacement(self.__game.currentPlayerTurn, self.__selectedShip, row, column, self.__shipPlacementOrientation):
+            newColour = "gray"
+        else:
+            newColour = "red"
+        for square in self.__game.coveredSquares(self.__selectedShip, row, column, self.__shipPlacementOrientation):
+            r, c = square
+            if 0 <= r < Game.dim and 0 <= c < Game.dim:
+                self.__buttons[r][c].set(self._ship)
+                button = self.__boardFrame.grid_slaves(row = r+1, column = c+1)[0]
+                button.config(fg = newColour)
+
+    def __removeShipShadow(self, row, column, orientation=None):
+        if self.__selectedShip != None:
+            if orientation == None:
+                orientation = self.__shipPlacementOrientation
+            for square in self.__game.coveredSquares(self.__selectedShip, row, column, orientation):
+                r, c = square
+                if 0 <= r < Game.dim and 0 <= c < Game.dim:
+                    self.__buttons[r][c].set(self._icons[self.__game.board[self.__game.currentPlayerTurn][Game.ShipBoard][r][c]])
+                    button = self.__boardFrame.grid_slaves(row = r+1, column = c+1)[0]
+                    button.config(fg = "gray")
+
+    def __gameFireOnButtonSelect(self, row, col):
+        #To do. Finish implementation of console
+        m = f"Shot taken by {self.__game.currentPlayerTurn.name} at {row}, {col}"
+        print(m)
+        message = Label(self.__consoleFrame, bg = "white", fg = "green", text = m, anchor = W)
+        message.grid(column = 0, row = self.__consoleLabelCount, sticky = E+W)
+        self.__consoleLabelCount += 1
+
+        self.__game.fire(col, row)
+        self.__game.changeTurn()
 
     def __settings(self): #To Do Change text colour and button colour
         # This removes the main menu from the root window
