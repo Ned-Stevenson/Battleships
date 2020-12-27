@@ -225,7 +225,7 @@ class Game:
     def winner(self):
         # Itterating through each board of ships and checking to see if any ships remain
         for player, playerBoard in self.__board.items():
-            shipBoard = playerBoard[0]
+            shipBoard = playerBoard[Game.ShipBoard]
             win = True
             for row in range(Game.dim):
                 for col in range(Game.dim):

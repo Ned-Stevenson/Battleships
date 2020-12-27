@@ -170,8 +170,7 @@ class Gui(Ui): #To Do
             self.__boardMode = Game.ShotBoard
             self.__gameFireColumn = self.__gameFireRow = None
             confirmShipPlacementButton = self.__shipIconsFrame.grid_slaves(row = len(SHIPS), column = 0)[0]
-            cmd = lambda : self.__gameFireOnButtonSelect(self.__gameFireRow, self.__gameFireColumn)
-            confirmShipPlacementButton.config(text = "Confirm shot placement", command = cmd)
+            confirmShipPlacementButton.config(text = "Confirm shot placement", command = self.__gameFireOnButtonSelect)
         self.__game.changeTurn()
         self.__showHoldingScreen(self.__game.currentPlayerTurn)
 
@@ -188,8 +187,11 @@ class Gui(Ui): #To Do
         holdingScreen.grid_columnconfigure(0, weight = 1)
 
         # Reconfigure main game screen
-        for row, col in product(range(Game.dim), range(Game.dim)):
+        for row, col in product(range(Game.dim), repeat = 2):
             self.__buttons[row][col].set(self._icons[self.__game.board[newPlayer][self.__boardMode][row][col]])
+            button = self.__boardFrame.grid_slaves(row = row + 1, column = col + 1)[0]
+            newButtonState = DISABLED if self.__game.board[newPlayer][Game.ShotBoard][row][col] in (Game.hit, Game.miss) else NORMAL
+            button.config(state = newButtonState)
         if self.__boardMode == Game.ShipBoard:
             for shipIndex in range(len(SHIPS)):
                 shipButton = self.__shipIconsFrame.grid_slaves(row = shipIndex, column = 0)[0]
@@ -267,17 +269,26 @@ class Gui(Ui): #To Do
                     button = self.__boardFrame.grid_slaves(row = r+1, column = c+1)[0]
                     button.config(fg = "gray")
 
-    def __gameFireOnButtonSelect(self, row, col):
-        #To do. Finish implementation of console
-        m = f"Shot taken by {self.__game.currentPlayerTurn.name} at {row}, {col}"
-        print(m)
-        # message = Label(self.__consoleFrame, bg = "white", fg = "green", text = m, anchor = W)
-        # message.grid(column = 0, row = self.__consoleLabelCount, sticky = E+W)
-        # self.__consoleLabelCount += 1
+    def __gameFireOnButtonSelect(self):
+        row = self.__gameFireRow
+        col = self.__gameFireColumn
+        if row != None:
+            #To do. Finish implementation of console
+            m = f"Shot taken by {self.__game.currentPlayerTurn.name} at {row}, {col}"
+            print(m)
+            # message = Label(self.__consoleFrame, bg = "white", fg = "green", text = m, anchor = W)
+            # message.grid(column = 0, row = self.__consoleLabelCount, sticky = E+W)
+            # self.__consoleLabelCount += 1
 
-        self.__game.fire(col, row)
-        self.__game.changeTurn()
-        self.__showHoldingScreen(self.__game.currentPlayerTurn)
+            self.__game.fire(col, row)
+            confirmedCoordsButton = self.__boardFrame.grid_slaves(row = row + 1, column = col + 1)[0]
+            confirmedCoordsButton.config(state = DISABLED)
+            self.__game.changeTurn()
+            self.__gameFireColumn = self.__gameFireRow = None
+            if self.__game.winner == None:
+                self.__showHoldingScreen(self.__game.currentPlayerTurn)
+            else:
+                self.__showWinScreen()
 
     def __settings(self): #To Do Change text colour and button colour
         message = "Sorry, settings are not yet available"
@@ -301,9 +312,32 @@ class Gui(Ui): #To Do
         frame.grid_columnconfigure(0, weight = 1)
         self.__transitionToScreen(frame)
 
-    
     def __returnToMainMenu(self):
         self.__transitionToScreen(self._mainMenu)
+    
+    def __showWinScreen(self):
+        frame = Frame(self._root)
+        winner = self.__game.winner
+        Label(frame, text = f"{winner.name} is the winner!", **self._defaultLayout).grid(row = 0, column = 0, columnspan = 2, sticky = N+S+E+W)
+        boardFrames = dict()
+        for key in product(self.__game.board, (Game.ShipBoard, Game.ShotBoard)):
+            boardFrame = Frame(frame)
+            for x, y in product(range(Game.dim), repeat=2):
+                coordsContense = self._icons[self.__game.board[key[0]][key[1]][x][y]]
+                Label(boardFrame, text = coordsContense, **self._defaultLayout, borderwidth = 1, relief = SOLID).grid(row = x, column = y, sticky = N+S+E+W)
+            for rowCol in range(Game.dim):
+                boardFrame.grid_columnconfigure(rowCol, weight = 1)
+                boardFrame.grid_rowconfigure(rowCol, weight = 1)
+            boardFrames[key] = boardFrame
+            boardRow = {winner:0, self.__game.playerOpponent(winner):1}[key[0]]
+            boardCol = {Game.ShipBoard:0, Game.ShotBoard:1}[key[1]]
+            boardFrame.grid(row = boardRow, column = boardCol, sticky = N+S+E+W, padx = 5, pady = 5)
+        Button(frame, text = "Return to main menu", command = self.__returnToMainMenu, **self._defaultLayout).grid(row = 3, column = 0, columnspan = 2, sticky = N+S+E+W)
+        for i in range(4):
+            frame.grid_rowconfigure(i, weight = 1)
+        for i in range(2):
+            frame.grid_columnconfigure(i, weight = 1)
+        self.__transitionToScreen(frame)
 
 
 class Terminal(Ui):
