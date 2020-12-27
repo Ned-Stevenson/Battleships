@@ -78,7 +78,7 @@ Width: {self.__width}"""
             raise StopIteration
         col, row = divmod(self.__n, self.__length)
         self.__n += 1
-        return self.__shape[row][col]
+        return (row, col), self.__shape[row][col]
 
     @property
     def name(self):

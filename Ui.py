@@ -1,6 +1,6 @@
 from game import Game, SHIPS, vertical, horizontal ,Array2d
 from exceptions import ShotError
-from tkinter import Tk, Frame, Button, Grid, Label, Entry, Text, StringVar, N, S, E, W, X, Y, BOTH, TOP, BOTTOM, DISABLED, SOLID
+from tkinter import Tk, Frame, Button, Grid, Label, Entry, Text, StringVar, N, S, E, W, X, Y, BOTH, TOP, BOTTOM, DISABLED, NORMAL, SOLID
 from itertools import product
 from enum import auto
 
@@ -14,9 +14,6 @@ class Ui:
         Game.hit: self._hit, Game.miss: self._miss}
 
 class Gui(Ui): #To Do
-
-    shipPlacement = auto()
-    shotsBeingTaken = auto()
 
     def __init__(self):
         super(Gui, self).__init__()
@@ -51,10 +48,8 @@ class Gui(Ui): #To Do
     
     def __playGameMenu(self):
         # Unrender the previous frame and replace it with the game menu frame
-        self._mainMenu.pack_forget()
         frame = Frame(self._root, bg = self._background)
-        frame.pack(fill = BOTH, expand = True)
-        self._currentFrame = frame
+        self.__transitionToScreen(frame)
 
         # Adding widgets to the frame using the grid placement
         player1Box = Entry(frame, font = self._defaultText)
@@ -77,9 +72,9 @@ class Gui(Ui): #To Do
         game = Game(player1Name, player2Name)
         self.__game = game
         # Creating a frame for the whole window and placing a board frame within the larger frame
-        self._currentFrame.pack_forget()
         frame = Frame(self._root, bg = self._background)
         frame.bind_all("r", self.__toggleOrientation)
+        self.__mainGameFrame = frame
 
         board = Frame(frame, bg = self._background)
         board.grid(row = 0, column = 0, sticky = N+S+E+W, rowspan = 3)
@@ -139,7 +134,7 @@ class Gui(Ui): #To Do
         # To Do Implement adding messages to the console when an event occurs
 
         self.__shipPlacementOrientation = horizontal
-        self.__boardMode = Gui.shipPlacement
+        self.__boardMode = Game.ShipBoard
         self.__selectedShip = None
 
         shipIcons = Frame(frame, bg = self._background)
@@ -154,15 +149,72 @@ class Gui(Ui): #To Do
             shipButton.grid(row = index, column = 0, sticky = N+S+E+W)
             shipIcons.grid_rowconfigure(index, weight = 1)
 
-        frame.pack(fill = BOTH, expand = True)
-        self._currentFrame = frame
+        confirmShipPlacementButton = Button(shipIcons, command = self.__confirmShipPlacement, text = "Confirm ship placement", **self._defaultLayout)
+        confirmShipPlacementButton.grid(row = len(SHIPS), column = 0, sticky = N+S+E+W)
+        self.__bothPlayersPlacedShips = False
+
+        self.__transitionToScreen(frame)
 
         Button(frame, **self._defaultLayout, command = self.__returnToMainMenu, text = "Return to main menu").grid(row = 1, column = 1, sticky = N+S+E+W, columnspan = 2)
         Button(frame, **self._defaultLayout, text = "Save Game").grid(row = 2, column = 1, sticky = N+S+E+W, columnspan = 2)
 
+    def __confirmShipPlacement(self):
+        for shipIndex in range(len(SHIPS)):
+            button = self.__shipIconsFrame.grid_slaves(row = shipIndex, column = 0)[0]
+            if button.cget("state") != DISABLED:
+                # self.__console.write("You need to place all your ships before continuing")
+                return False
+        if self.__bothPlayersPlacedShips == False:
+            self.__bothPlayersPlacedShips = True
+        else:
+            self.__boardMode = Game.ShotBoard
+            self.__gameFireColumn = self.__gameFireRow = None
+            confirmShipPlacementButton = self.__shipIconsFrame.grid_slaves(row = len(SHIPS), column = 0)[0]
+            cmd = lambda : self.__gameFireOnButtonSelect(self.__gameFireRow, self.__gameFireColumn)
+            confirmShipPlacementButton.config(text = "Confirm shot placement", command = cmd)
+        self.__game.changeTurn()
+        self.__showHoldingScreen(self.__game.currentPlayerTurn)
+
+    def __showHoldingScreen(self, newPlayer):
+        holdingScreen = Frame(self._root, bg = self._background)
+        nextPlayerMessage = Label(holdingScreen, **self._defaultLayout, text = f"{newPlayer.name}, it's your turn")
+        cmd = lambda : self.__transitionToScreen(self.__mainGameFrame)
+        continueButton = Button(holdingScreen, **self._defaultLayout, text = "Continue", command = cmd)
+        nextPlayerMessage.grid(row = 0, column = 0, sticky = N+S+E+W)
+        continueButton.grid(row = 1, column = 0, sticky = N+S+E+W, padx = 400, pady = 100)
+
+        holdingScreen.grid_rowconfigure(0, weight = 5)
+        holdingScreen.grid_rowconfigure(1, weight = 1)
+        holdingScreen.grid_columnconfigure(0, weight = 1)
+
+        # Reconfigure main game screen
+        for row, col in product(range(Game.dim), range(Game.dim)):
+            self.__buttons[row][col].set(self._icons[self.__game.board[newPlayer][self.__boardMode][row][col]])
+        if self.__boardMode == Game.ShipBoard:
+            for shipIndex in range(len(SHIPS)):
+                shipButton = self.__shipIconsFrame.grid_slaves(row = shipIndex, column = 0)[0]
+                shipButton.config(state = NORMAL, bg = "SystemButtonFace")
+        
+        self.__transitionToScreen(holdingScreen)
+
+    def __transitionToScreen(self, newFrame):
+        self._currentFrame.pack_forget()
+        newFrame.pack(fill = BOTH, expand = True)
+        self._currentFrame = newFrame
+
     def __boardButtonPress(self, row, col):
-        if self.__boardMode == Gui.shipPlacement:
+        if self.__boardMode == Game.ShipBoard:
             self.__placeShip(row, col)
+        else:
+            if self.__gameFireRow != None:
+                previouslySelectedButton = self.__boardFrame.grid_slaves(row = self.__gameFireRow + 1, column = self.__gameFireColumn + 1)[0]
+                previouslySelectedButton.config(fg = self._text)
+                self.__buttons[self.__gameFireRow][self.__gameFireColumn].set(self._icons[self.__game.board[self.__game.currentPlayerTurn][Game.ShotBoard][row][col]])
+            self.__buttons[row][col].set("O")
+            selectedButton = self.__boardFrame.grid_slaves(row = row + 1, column = col + 1)[0]
+            selectedButton.config(fg = "black")
+            self.__gameFireRow = row
+            self.__gameFireColumn = col
 
     def __setSelectedShip(self, ship, shipIndex):
         for i in range(len(SHIPS)):
@@ -219,46 +271,39 @@ class Gui(Ui): #To Do
         #To do. Finish implementation of console
         m = f"Shot taken by {self.__game.currentPlayerTurn.name} at {row}, {col}"
         print(m)
-        message = Label(self.__consoleFrame, bg = "white", fg = "green", text = m, anchor = W)
-        message.grid(column = 0, row = self.__consoleLabelCount, sticky = E+W)
-        self.__consoleLabelCount += 1
+        # message = Label(self.__consoleFrame, bg = "white", fg = "green", text = m, anchor = W)
+        # message.grid(column = 0, row = self.__consoleLabelCount, sticky = E+W)
+        # self.__consoleLabelCount += 1
 
         self.__game.fire(col, row)
         self.__game.changeTurn()
+        self.__showHoldingScreen(self.__game.currentPlayerTurn)
 
     def __settings(self): #To Do Change text colour and button colour
-        # This removes the main menu from the root window
-        self._mainMenu.pack_forget()
-        # Preparing and adding the frame to the screen
         message = "Sorry, settings are not yet available"
         frame = Frame(self._root)
-        frame.pack(fill = BOTH, expand = True)
         Label(frame, text = message, **self._defaultLayout).grid(row = 0, column = 0, sticky = N+S+E+W)
         Button(frame, text = "Return to main menu", command = self.__returnToMainMenu, **self._defaultLayout).grid(row = 1, column = 0, sticky = N+S+E+W)
         # This means that the row of the grid containing the text will always be 3 times larger than the row for the button
         frame.grid_rowconfigure(0, weight = 3)
         frame.grid_rowconfigure(1, weight = 1)
         frame.grid_columnconfigure(0, weight = 1)
-        self._currentFrame = frame
+        self.__transitionToScreen(frame)
 
     def __userStats(self): #To Do Change text colour and button colour
-        # This removes the main menu from the root window
-        self._mainMenu.pack_forget()
-        # Preparing and adding the frame to the screen
         message = "Sorry, user stats are not yet available"
         frame = Frame(self._root)
-        frame.pack(fill = BOTH, expand = True)
         Label(frame, text = message, **self._defaultLayout).grid(row = 0, column = 0, sticky = N+S+E+W)
         Button(frame, text = "Return to main menu", command = self.__returnToMainMenu, **self._defaultLayout).grid(row = 1, column = 0, sticky = N+S+E+W)
         # This means that the row of the grid containing the text will always be 3 times larger than the row for the button
         frame.grid_rowconfigure(0, weight = 3)
         frame.grid_rowconfigure(1, weight = 1)
         frame.grid_columnconfigure(0, weight = 1)
-        self._currentFrame = frame
+        self.__transitionToScreen(frame)
+
     
     def __returnToMainMenu(self):
-        self._currentFrame.pack_forget()
-        self._mainMenu.pack(fill = BOTH, expand = True)
+        self.__transitionToScreen(self._mainMenu)
 
 
 class Terminal(Ui):
