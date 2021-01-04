@@ -1,8 +1,10 @@
 from game import Game, SHIPS, vertical, horizontal ,Array2d
 from exceptions import ShotError
-from tkinter import Tk, Frame, Button, Grid, Label, Entry, Text, StringVar, N, S, E, W, X, Y, BOTH, TOP, BOTTOM, DISABLED, NORMAL, SOLID
+from tkinter import Tk, Frame, Button, Grid, Label, Entry, Text, Scrollbar, Canvas, Checkbutton, StringVar, IntVar, N, S, E, W, X, Y, BOTH, TOP, BOTTOM, RIGHT, LEFT, DISABLED, NORMAL, SOLID, END, VERTICAL
 from itertools import product
 from enum import auto
+from database import loginUserAccount, createUserAccount, listSaves, saveGame, loadGame
+from sqlite3 import IntegrityError
 
 class Ui:
     def __init__(self):
@@ -26,22 +28,25 @@ class Gui(Ui): #To Do
         root.overrideredirect(True) # Makes the application borderless
         root.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}+0+0")
         root.title("Battleships")
-        frame = Frame(root)
+        frame = Frame(root, bg = self._background)
         frame.pack(fill = BOTH, expand = True)
         # These buttons will be displayed on the main menu
-        Button(frame, text = "Play Game", command = self.__playGameMenu, **self._defaultLayout).grid(row = 0, column = 0, sticky = N + S + E + W)
-        Button(frame, text = "Settings", command = self.__settings, **self._defaultLayout).grid(row = 1, column = 0, sticky = N + S + E + W)
-        Button(frame, text = "User stats", command = self.__userStats, **self._defaultLayout).grid(row = 2, column = 0, sticky = N + S + E + W)
-        Button(frame, text = "Exit", command = root.quit, **self._defaultLayout).grid(row = 3, column = 0, sticky = N + S + E + W)
+        Button(frame, text = "Play Game", command = self.__playGameMenu, **self._defaultLayout).grid(row = 0, column = 0, sticky = N + S + E + W, padx = 30, pady = 20)
+        Button(frame, text = "Settings", command = self.__settings, **self._defaultLayout).grid(row = 1, column = 0, sticky = N + S + E + W, padx = 30, pady = 20)
+        Button(frame, text = "User stats", command = self.__userStats, **self._defaultLayout).grid(row = 2, column = 0, sticky = N + S + E + W, padx = 30, pady = 20)
+        Button(frame, text = "Log in", command = self.__loginScreen, **self._defaultLayout).grid(row = 3, column = 0, sticky = N + S + E + W, padx = 30, pady = 20)
+        Button(frame, text = "Exit", command = root.quit, **self._defaultLayout).grid(row = 4, column = 0, sticky = N + S + E + W, padx = 30, pady = 20)
 
         # Weighting the rows and columns to make all of the buttons on the screen of equal size
         frame.grid_columnconfigure(0, weight = 1)
-        for i in range(4):
+        for i in range(5):
             frame.grid_rowconfigure(i, weight = 1)
 
         self._root = root
         self._mainMenu = frame
         self._currentFrame = frame
+
+        self.__userID = None
     
     def run(self):
         self._root.mainloop()
@@ -54,27 +59,41 @@ class Gui(Ui): #To Do
         # Adding widgets to the frame using the grid placement
         player1Box = Entry(frame, font = self._defaultText)
         player1Box.insert(0, "Player 1")
+        player1AIVar = IntVar()
+        player1AI = Checkbutton(frame, text = "AI", variable = player1AIVar, **self._defaultLayout)
+        player1AI.grid(row = 0, column = 1, sticky = N+S+E+W, padx = 50, pady = 50)
+        player1Box.grid(row = 0, column = 0)
+
         player2Box = Entry(frame, font = self._defaultText)
         player2Box.insert(0, "Player 2")
-        player1Box.grid(row = 0, column = 0)
+        player2AIVar = IntVar()
+        player2AI = Checkbutton(frame, text = "AI", variable = player2AIVar)
+        player2AI.grid(row = 1, column = 1, sticky = N+S+E+W, padx = 50, pady = 50)
         player2Box.grid(row = 1, column = 0)
         # This lambda, when called, will simply apply the player names to the game GUI constructor
-        startGame = lambda: self.__startGame(player1Box.get(), player2Box.get())
-        Button(frame, text = "Start game", command = startGame, **self._defaultLayout).grid(row = 0, column = 1, rowspan = 2, sticky = N+S+E+W)
-        Button(frame, text = "Return to main menu", command = self.__returnToMainMenu, **self._defaultLayout).grid(row = 2, column = 0, columnspan = 2, sticky = N+S+E+W)
+        startGame = lambda: self.__startGame(player1Box.get(), player2Box.get(), player1AIVar, player2AIVar)
+        Button(frame, text = "Start game", command = startGame, **self._defaultLayout).grid(row = 0, column = 2, sticky = N+S+E+W)
+        Button(frame, text = "Load game", command = self.__loadGameMenu, **self._defaultLayout).grid(row = 1, column = 2, sticky = N+S+E+W)
+        Button(frame, text = "Return to main menu", command = self.__returnToMainMenu, **self._defaultLayout).grid(row = 2, column = 0, columnspan = 3, sticky = N+S+E+W)
 
         for i in range(3):
             frame.grid_rowconfigure(i, weight = 1)
-        frame.grid_columnconfigure(0, weight = 2)
+        frame.grid_columnconfigure(0, weight = 3)
         frame.grid_columnconfigure(1, weight = 1)
+        frame.grid_columnconfigure(1, weight = 2)
 
-    def __startGame(self, player1Name, player2Name):
-        game = Game(player1Name, player2Name)
+    def __startGame(self, player1Name, player2Name, player1AI, player2AI):
+        game = Game(player1Name, player2Name, bool(player1AI), bool(player2AI))
         self.__game = game
         # Creating a frame for the whole window and placing a board frame within the larger frame
         frame = Frame(self._root, bg = self._background)
         frame.bind_all("r", self.__toggleOrientation)
         self.__mainGameFrame = frame
+
+        self.__player1ID = None
+        self.__player2ID = None
+        self.__fleet1ID = None
+        self.__fleet2ID = None
 
         board = Frame(frame, bg = self._background)
         board.grid(row = 0, column = 0, sticky = N+S+E+W, rowspan = 3)
@@ -155,8 +174,8 @@ class Gui(Ui): #To Do
 
         self.__transitionToScreen(frame)
 
-        Button(frame, **self._defaultLayout, command = self.__returnToMainMenu, text = "Return to main menu").grid(row = 1, column = 1, sticky = N+S+E+W, columnspan = 2)
-        Button(frame, **self._defaultLayout, text = "Save Game").grid(row = 2, column = 1, sticky = N+S+E+W, columnspan = 2)
+        Button(frame, **self._defaultLayout, text = "Return to main menu", command = self.__returnToMainMenu).grid(row = 1, column = 1, sticky = N+S+E+W, columnspan = 2)
+        Button(frame, **self._defaultLayout, text = "Save Game", command = self.__saveGameCallback).grid(row = 2, column = 1, sticky = N+S+E+W, columnspan = 2)
 
     def __confirmShipPlacement(self):
         for shipIndex in range(len(SHIPS)):
@@ -301,7 +320,102 @@ class Gui(Ui): #To Do
         frame.grid_columnconfigure(0, weight = 1)
         self.__transitionToScreen(frame)
 
+    def __loginScreen(self):
+        frame = Frame(self._root, bg = self._background)
+        usernameFrame = Frame(frame, bg = self._background)
+        passwordFrame = Frame(frame, bg = self._background)
+        username = Entry(usernameFrame, font = self._defaultText)
+        password = Entry(passwordFrame, font = self._defaultText, show = "*")
+        login = lambda : self.__loginCallback(username.get(), password.get())
+        createAccount = lambda : self.__createAccountCallback(username.get(), password.get())
+        loginButton = Button(frame, command = login, text = "Login", **self._defaultLayout)
+        createAccountButton = Button(frame, text = "Create Account", command = createAccount, **self._defaultLayout)
+        returnToMain = Button(frame, command = self.__returnToMainMenu, text = "Return to main menu", **self._defaultLayout)
+
+
+        Label(usernameFrame, text = "Username", **self._defaultLayout, anchor = S+W).grid(row = 0, column = 0, sticky = N+S+E+W, padx = 50)
+        username.grid(row = 1, column = 0, sticky = N+S+E+W, padx = 50)
+        usernameFrame.grid_rowconfigure(0, weight = 1)
+        usernameFrame.grid_rowconfigure(1, weight = 3)
+        usernameFrame.grid_columnconfigure(0, weight = 1)
+
+        Label(passwordFrame, text = "Password", **self._defaultLayout, anchor = W).grid(row = 0, column = 0, sticky = N+S+E+W, padx = 50)
+        password.grid(row = 1, column = 0, sticky = N+S+E+W, padx = 50)
+        passwordFrame.grid_rowconfigure(0, weight = 1)
+        passwordFrame.grid_rowconfigure(1, weight = 3)
+        passwordFrame.grid_columnconfigure(0, weight = 1)
+
+        frame.columnconfigure(0, weight = 1)
+        frame.columnconfigure(1, weight = 1)
+        usernameFrame.grid(row = 1, column = 0, sticky = N+S+E+W, pady = 80, columnspan = 2)
+        passwordFrame.grid(row = 2, column = 0, sticky = N+S+E+W, pady = 80, columnspan = 2)
+        loginButton.grid(row = 3, column = 0, sticky = N+S+E+W, padx = 50, pady = 10)
+        createAccountButton.grid(row = 3, column = 1, sticky = N+S+E+W, padx = 50, pady = 10)
+        returnToMain.grid(row = 4, column = 0, sticky = N+S+E+W, padx = 50, pady = 10, columnspan = 2)
+
+        for i in range(5):
+            frame.grid_rowconfigure(i, weight = 1)
+        self.__transitionToScreen(frame)
+
+    def __loginCallback(self, username, password):
+        if username and password:
+            userID = loginUserAccount(username, password)
+            frame = self._currentFrame
+            if userID != None:
+                self.__userID = userID
+                feedbackMessage = f"Log in as {username} successful"
+            else:
+                feedbackMessage = f"Log in as {username} unsuccessful"
+            Label(frame, text = feedbackMessage, **self._defaultLayout).grid(row = 0, column = 0, ipady = 10)
+
+    def __createAccountCallback(self, username, password):
+        """Attempts to create an account in the database"""
+        if username and password:
+            frame = self._currentFrame
+            try:
+                createUserAccount(username, password)
+            except IntegrityError:
+                feedbackMessage = f"Account creation for {username} failed. Account already exists"
+            else:
+                feedbackMessage = f"Account creation for {username} successful"
+            Label(frame, text = feedbackMessage, **self._defaultLayout).grid(row = 0, column = 0, ipady = 10)
+
+    def __loadGameMenu(self):
+        frame = Frame(self._root, bg = self._background)
+        saves = listSaves(self.__userID)
+        commandTextList = []
+        for saveID in saves:
+            cmd = lambda : self.__loadGameCallback(saveID)
+            commandTextList.append((cmd, f"Save ID: {saveID}"))
+        scrollBox = VerticalScrolledFrame(frame, bg = "blue")
+        for command, message in commandTextList:
+            b = Button(scrollBox.interior, text = message, command = command, **self._defaultLayout)
+            b.pack(anchor = N, fill = X, expand = True, pady = 5, padx = 10)
+        scrollBox.grid(row = 0, column = 0, sticky = N+S+E+W, padx = 20, pady = 20)
+        Button(frame, text = "Return to game menu", command = self.__playGameMenu, **self._defaultLayout).grid(row = 1, column = 0, padx = 50, pady = 30, sticky = N+S+E+W)
+
+        frame.grid_columnconfigure(0, weight = 1)
+        frame.grid_rowconfigure(0, weight = 4)
+        frame.grid_rowconfigure(1, weight = 1)
+
+        self.__transitionToScreen(frame)
     
+    def __loadGameCallback(self, SaveID):
+        player1, player2, fleet1, fleet2, turnNumber, gameBoard, gameDimentions = loadGame(SaveID)
+
+    def __saveGameCallback(self):
+        """Must collect data Player1, Player2, Fleet1, Fleet2, DateSaved, TurnNumber, GameBoard, BoardSize"""
+        player1 = self.__player1ID
+        player2 = self.__player2ID
+        fleet1 = self.__fleet1ID
+        fleet2 = self.__fleet2ID
+        turnNumber = self.__game.turnNumber
+        gameBoard = self.__game.board
+        boardSize = Game.dim
+        saveGame(player1, player2, fleet1, fleet2, turnNumber, gameBoard, boardSize)
+
+        # Add to statistics
+
     def __returnToMainMenu(self):
         self.__transitionToScreen(self._mainMenu)
 
@@ -420,3 +534,63 @@ class Terminal(Ui):
         
         Or input coordinates to fire at those coordinates""")
         return input()
+
+class Console(Frame):
+    def __init__(self, master, *args, **kwargs):
+        Frame.__init__(master, *args, **kwargs)
+        kwargs["state"] = DISABLED
+        kwargs["anchor"] = S
+        self.__text = Text(master, *args, **kwargs)
+        self.__text.pack(fill = BOTH, expand = True)
+
+    def write(self, text:str):
+        self.__text.config(state = NORMAL)
+        self.__text.insert(END, text+"\n")
+        self.__text.config(state = DISABLED)
+
+# Taken from https://stackoverflow.com/questions/31762698/dynamic-button-with-scrollbar-in-tkinter-python
+# to be used for a list of interactable options of unknown length, such as all available saved games
+class VerticalScrolledFrame(Frame):
+    """A pure Tkinter scrollable frame that actually works!
+
+    * Use the 'interior' attribute to place widgets inside the scrollable frame
+    * Construct and pack/place/grid normally
+    * This frame only allows vertical scrolling
+    """
+    def __init__(self, parent, *args, **kw):
+        Frame.__init__(self, parent, *args, **kw)            
+
+        # create a canvas object and a vertical scrollbar for scrolling it
+        vscrollbar = Scrollbar(self, orient=VERTICAL)
+        vscrollbar.pack(fill=Y, side=RIGHT, expand=False)
+        canvas = Canvas(self, bd=0, highlightthickness=0, relief = SOLID,
+                        yscrollcommand=vscrollbar.set, **kw)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        vscrollbar.config(command=canvas.yview)
+
+        # reset the view to watch the whole canvas
+        canvas.xview_moveto(0)
+        canvas.yview_moveto(0)
+
+        # create a frame inside the canvas which will be scrolled with it
+        self.interior = interior = Frame(canvas)
+        interior_id = canvas.create_window(0, 0, window=interior,
+                                           anchor=N+W)
+
+        # track changes to the canvas and frame width and sync them,
+        # also updating the scrollbar
+        def _configure_interior(event):
+            # update the scrollbars to match the size of the inner frame
+            size = (interior.winfo_reqwidth(), interior.winfo_reqheight())
+            canvas.config(scrollregion="0 0 %s %s" % size)
+            if interior.winfo_reqwidth() != canvas.winfo_width():
+                # update the canvas's width to fit the inner frame
+                canvas.config(width=interior.winfo_reqwidth())
+
+        interior.bind('<Configure>', _configure_interior)
+
+        def _configure_canvas(event):
+            if interior.winfo_reqwidth() != canvas.winfo_width():
+                # update the inner frame's width to fill the canvas
+                canvas.itemconfigure(interior_id, width=canvas.winfo_width())
+        canvas.bind('<Configure>', _configure_canvas)
